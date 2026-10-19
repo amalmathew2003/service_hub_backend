@@ -1,396 +1,133 @@
-# 🛠️ ServiceHub AI — Backend Engine
+<div align="center">
 
-<p align="center">
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/Python_3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+" />
-  <img src="https://img.shields.io/badge/Firebase_Admin-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase Admin" />
-  <img src="https://img.shields.io/badge/Firebase_FCM-FFA000?style=for-the-badge&logo=firebase&logoColor=white" alt="FCM" />
-  <img src="https://img.shields.io/badge/Groq_Cloud-FF4F00?style=for-the-badge&logo=openai&logoColor=white" alt="Groq AI" />
-  <img src="https://img.shields.io/badge/Pydantic_v2-E92063?style=for-the-badge&logo=pydantic&logoColor=white" alt="Pydantic v2" />
-</p>
+# 🛠️ ServiceHub AI — Backend
 
-<p align="center">
-  <strong>Production-grade, AI-driven microservice backend powering the on-demand local services ecosystem.</strong><br />
-  Coordinates real-time geospatial discovery, conversational intent extraction with Groq LLMs, idempotent customer bookings, and instant cross-platform push notifications via Firebase Cloud Messaging (FCM).
-</p>
+**The intelligence layer behind ServiceHub AI: intent recognition, geospatial search, secure bookings and push notifications.**
+
+<br/>
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
+[![Firebase Admin](https://img.shields.io/badge/Firebase-Admin%20SDK-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/docs/admin/setup)
+[![FCM](https://img.shields.io/badge/Push-FCM-FFA000?style=for-the-badge&logo=firebase&logoColor=white)](https://firebase.google.com/docs/cloud-messaging)
+[![Groq](https://img.shields.io/badge/AI-Groq%20Cloud-FF4F00?style=for-the-badge)](https://groq.com)
+[![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063?style=for-the-badge&logo=pydantic&logoColor=white)](https://docs.pydantic.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+
+<br/>
+
+📱 **Mobile app:** [service_hub_ai](https://github.com/amalmathew2003/service_hub_ai) (Flutter)
+
+</div>
+
+---
+
+## 💡 What is it?
+
+ServiceHub connects customers who need help *right now* (plumbers, electricians, AC technicians, cleaners, mechanics) with nearby verified professionals.
+
+This backend sits between the **Flutter client**, **Cloud Firestore**, **Firebase Auth**, **FCM** and **Groq**, and does four jobs:
+
+| Job | What it does |
+|---|---|
+| 🧠 **Understand** | Turns messages like *"water is leaking from my ceiling"* into a real service from your Firestore catalog |
+| 📍 **Discover** | Finds online staff within a radius using Haversine distance |
+| 🔐 **Transact** | Verifies Firebase ID tokens, blocks role abuse, creates bookings idempotently |
+| 🔔 **Notify** | Sends high-priority FCM pushes to staff devices when a job arrives |
+
+> 🛡️ **Integrity rule:** the LLM only interprets language. Staff, availability, distances and bookings always come from Firestore, never from the model.
 
 ---
 
 ## 📑 Table of Contents
 
-- [Overview](#-overview)
-- [System Architecture](#-system-architecture)
-- [Key Features](#-key-features)
-- [API Reference](#-api-reference)
-  - [Authentication & Security](#authentication--security)
-  - [AI & Natural Language Processing](#1-ai--natural-language-processing)
-  - [Geospatial Staff Search](#2-geospatial-staff-search)
-  - [Staff Catalog Suggestions](#3-staff-catalog-suggestions)
-  - [Customer Bookings & Push Dispatch](#4-customer-bookings--push-dispatch)
-  - [FCM Testing & Diagnostics](#5-fcm-testing--diagnostics)
-  - [Custom Service Requests](#6-custom-service-requests)
-  - [Health & Connectivity](#7-health--connectivity)
-- [Database Architecture & Firestore Schemas](#-database-architecture--firestore-schemas)
-- [Project Structure](#-project-structure)
-- [Installation & Quickstart](#-installation--quickstart)
+- [Features](#-features)
+- [Architecture](#️-architecture)
+- [Quickstart](#-quickstart)
 - [Environment Variables](#-environment-variables)
+- [API Reference](#-api-reference)
+- [Firestore Schema](#️-firestore-schema)
+- [Project Structure](#-project-structure)
+- [Security](#️-security)
+- [Troubleshooting](#-troubleshooting)
 - [Related Repositories](#-related-repositories)
+- [Contributing](#-contributing)
 - [License](#-license)
 
 ---
 
-## 🌟 Overview
+## ✨ Features
 
-**ServiceHub** bridges customers seeking immediate on-demand assistance (plumbers, electricians, cleaners, mechanics, etc.) with verified local service professionals.
-
-This backend serves as the intelligent orchestration layer between the **Flutter Mobile Client** (`service_hub_ai`), **Firebase Cloud Firestore**, **Firebase Authentication**, **Firebase Cloud Messaging (FCM)**, and ultra-low-latency **Groq LPU Inference**.
-
-### Why This Backend Exists
-1. **Intelligent Intent Recognition:** Converts ambiguous user prompts (e.g., *"water is leaking from my ceiling"*) into exact, verified service catalog entries stored in Firestore.
-2. **Geospatial Discovery:** Computes precise Haversine distance vectors across active, online providers within custom radius constraints.
-3. **Secure Transaction Lifecycle:** Validates Firebase ID tokens, prevents role escalation (staff booking staff), and creates bookings atomically with built-in idempotency keys.
-4. **Instant Event Dispatch:** Dispatches high-priority push notifications to staff mobile devices via FCM with custom payloads for immediate interaction.
-
----
-
-## 🏗️ System Architecture
-
-```
-                  ┌──────────────────────────────────────────────┐
-                  │          Flutter Client Application          │
-                  │        (Customer & Provider Interfaces)      │
-                  └───────┬──────────────────────────────▲───────┘
-                          │                              │
-             HTTPS REST   │ Bearer ID Token              │ High-Priority
-             Requests     │                              │ Push (FCM)
-                          ▼                              │
-             ┌───────────────────────────────────────────┴──────────┐
-             │            FastAPI Backend Microservice             │
-             │                                                      │
-             │  • Auth Token Verification   • Haversine Geo Search  │
-             │  • Request Sanitization      • Idempotency Engine    │
-             │  • Pydantic v2 Models        • Prompt Engineering    │
-             └──────┬──────────────────────┬─────────────────┬──────┘
-                    │                      │                 │
-       Fast LPU     │         Admin SDK    │      Admin SDK  │
-       Inference    │         Transactions │      Push API   │
-                    ▼                      ▼                 ▼
-          ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-          │   Groq Cloud     │   │ Firebase Cloud   │   │ Firebase Cloud   │
-          │   (LLM Engine)   │   │    Firestore     │   │ Messaging (FCM)  │
-          └──────────────────┘   └──────────────────┘   └──────────────────┘
-```
-
----
-
-## ✨ Key Features
-
-- **Conversational AI Assistant (`/chat`):** Provides contextual customer support to guide users toward the right category of service.
-- **Service Intent Matching (`/identify-service`):** Matches natural language descriptions against real-time Firestore service collections using Groq with algorithmic fallback logic.
-- **Provider Suggestion Engine (`/staff/service-suggestions`):** Dynamically suggests relevant service offerings (e.g., HVAC/AC maintenance packages) to staff during onboarding.
-- **Haversine Geo-Filtering (`/staff/search`):** Real-time spatial query returning distance in kilometers, provider ratings, availability (`isOnline: true`), and offered services.
-- **Secure Idempotent Booking Flow (`/bookings`):** Verifies customer identity via Firebase Auth, confirms provider service validity, locks booking against double-submission, and triggers staff notifications.
-- **FCM Device Notification Delivery (`/notifications/test`):** End-to-end device token validation with support for Android high-priority channels and Apple APNS sound payloads.
-- **Unregistered Service Registry (`/service-requests`):** Captures unmet service demands to help expand platform offerings.
-
----
-
-## 📡 API Reference
-
-Interactive documentation is automatically generated by FastAPI:
-- **Swagger UI:** `http://127.0.0.1:8000/docs`
-- **ReDoc:** `http://127.0.0.1:8000/redoc`
-
-### Authentication & Security
-
-Protected endpoints require a Firebase ID token passed in the `Authorization` header:
-
-```http
-Authorization: Bearer <FIREBASE_ID_TOKEN>
-```
-
-The server decodes and cryptographically verifies the token using `firebase_admin.auth.verify_id_token(token, check_revoked=True)`.
-
----
-
-### 1. AI & Natural Language Processing
-
-#### `POST /chat`
-General conversational endpoint to answer user questions and recommend local services.
-
-- **Request Body:**
-  ```json
-  {
-    "message": "My kitchen tap is dripping continuously. Who can fix it?"
-  }
-  ```
-- **Response (`200 OK`):**
-  ```json
-  {
-    "reply": "It looks like you have a plumbing leak. I recommend booking a certified Plumber to replace the washer or repair the pipe valve."
-  }
-  ```
-
----
-
-#### `POST /identify-service`
-Maps unstructured natural language to an exact service name currently registered in Firestore.
-
-- **Request Body:**
-  ```json
-  {
-    "message": "I need my split air conditioner cleaned and serviced before summer."
-  }
-  ```
-- **Response (`200 OK`):**
-  ```json
-  {
-    "reply": "I found a matching service: AC Cleaning. Would you like to proceed?",
-    "service_name": "AC Cleaning",
-    "requires_confirmation": false
-  }
-  ```
-
----
-
-### 2. Geospatial Staff Search
-
-#### `GET /staff/search`
-Queries online service providers within a geographic radius who offer the requested service.
-
-- **Query Parameters:**
-  | Parameter | Type | Required | Description |
-  |-----------|------|----------|-------------|
-  | `latitude` | `float` | Yes | Customer's latitude (e.g. `9.9312`) |
-  | `longitude` | `float` | Yes | Customer's longitude (e.g. `76.2673`) |
-  | `service_name`| `string` | No | Target service filter (e.g. `Plumbing`) |
-  | `radius_km` | `float` | No | Search radius in kilometers (Default: `15.0`) |
-
-- **Sample Request:**
-  ```http
-  GET /staff/search?latitude=9.9816&longitude=76.2999&service_name=AC%20Cleaning&radius_km=10
-  ```
-
-- **Response (`200 OK`):**
-  ```json
-  {
-    "count": 1,
-    "service_name": "AC Cleaning",
-    "radius_km": 10.0,
-    "staff": [
-      {
-        "staff_id": "u4JkL992aP",
-        "name": "Alex Thomas",
-        "location_name": "Kaloor, Kochi",
-        "profile_image": "https://storage.googleapis.com/...",
-        "latitude": 9.9890,
-        "longitude": 76.3050,
-        "distance_km": 0.98,
-        "services": [
-          {
-            "service_id": "srv_ac_01",
-            "name": "AC Cleaning",
-            "description": "Deep chemical foam washing and coil cleaning"
-          }
-        ]
-      }
-    ]
-  }
-  ```
-
----
-
-### 3. Staff Catalog Suggestions
-
-#### `POST /staff/service-suggestions`
-Assists service providers during onboarding by generating standardized service catalog recommendations based on keyword input.
-
-- **Request Body:**
-  ```json
-  {
-    "service_text": "air conditioner"
-  }
-  ```
-- **Response (`200 OK`):**
-  ```json
-  {
-    "query": "air conditioner",
-    "source": "groq",
-    "suggestions": [
-      "AC Mechanic",
-      "AC Cleaning",
-      "AC Installation",
-      "AC Gas Refilling",
-      "AC Water Leakage Repair"
-    ]
-  }
-  ```
-
----
-
-### 4. Customer Bookings & Push Dispatch
-
-#### `POST /bookings`
-Creates an atomic booking record in Firestore and immediately dispatches a push notification to the assigned staff member.
-
-- **Headers:** `Authorization: Bearer <CUSTOMER_FIREBASE_ID_TOKEN>`
-- **Request Body:**
-  ```json
-  {
-    "id": "book_981240182",
-    "staffId": "staff_uid_456",
-    "serviceId": "srv_plumb_01",
-    "scheduledDate": "2026-10-25T10:30:00Z",
-    "staffLatitude": 9.9890,
-    "staffLongitude": 76.3050
-  }
-  ```
-
-- **Response (`201 Created`):**
-  ```json
-  {
-    "success": true,
-    "bookingId": "book_981240182",
-    "notificationSent": true,
-    "alreadyCreated": false,
-    "message": "Booking created successfully."
-  }
-  ```
-
-- **Idempotency Guarantee:** If the network disconnects and the mobile client retries with the same `id`, the backend recognizes the existing record, avoids duplicate booking creation, and returns `alreadyCreated: true`.
-
----
-
-### 5. FCM Testing & Diagnostics
-
-#### `POST /notifications/test`
-Validates FCM push delivery to the authenticated staff member's registered device.
-
-- **Headers:** `Authorization: Bearer <STAFF_FIREBASE_ID_TOKEN>`
-- **Response (`200 OK`):**
-  ```json
-  {
-    "success": true,
-    "messageId": "projects/servicehub/messages/0:1697...",
-    "message": "Firebase accepted the test notification for delivery."
-  }
-  ```
-
----
-
-### 6. Custom Service Requests
-
-#### `POST /service-requests`
-Enables customers to request services that are not yet listed on the platform.
-
-- **Request Body:**
-  ```json
-  {
-    "requested_service": "Solar Panel Pressure Washing",
-    "description": "Need rooftop solar panels cleaned of moss and dust"
-  }
-  ```
-- **Response (`201 Created`):**
-  ```json
-  {
-    "success": true,
-    "request_id": "req_88a9df21",
-    "requested_service": "Solar Panel Pressure Washing",
-    "status": "pending",
-    "message": "Thank you for your suggestion! We've recorded your request for future review."
-  }
-  ```
-
----
-
-### 7. Health & Connectivity
-
-| Method | Endpoint | Description |
+| Feature | Endpoint | Notes |
 |---|---|---|
-| `GET` | `/` | Root status message |
-| `GET` | `/health` | Liveness probe returning `{"status": "healthy"}` |
-| `GET` | `/firebase-test` | Verifies Firestore connectivity and lists root collections |
-| `GET` | `/firebase-users-test` | Diagnostic inspection of the first 5 records in `users` |
+| Conversational assistant | `POST /chat` | Guides users toward the right type of service |
+| Service identification | `POST /identify-service` | Groq classification with algorithmic fallback, matched against live Firestore services |
+| Staff service suggestions | `POST /staff/service-suggestions` | Helps staff build their catalog during onboarding |
+| Nearby staff search | `GET /staff/search` | Haversine filter, online staff only, returns distance in km |
+| Idempotent booking | `POST /bookings` | Auth-verified, retry-safe, triggers push notification |
+| FCM diagnostics | `POST /notifications/test` | Verifies push delivery to the caller's device |
+| Unmet-demand registry | `POST /service-requests` | Captures services users want but the platform lacks |
+| Health checks | `GET /health` and others | Liveness and Firestore connectivity |
 
 ---
 
-## 🗄️ Database Architecture & Firestore Schemas
+## 🏗️ Architecture
 
+```mermaid
+graph LR
+    A[Flutter App<br/>Customer + Staff] -- HTTPS + Bearer ID token --> B[FastAPI Backend]
+    B -- Prompt + catalog --> C[Groq Cloud<br/>LLM]
+    B -- Admin SDK<br/>reads / transactions --> D[(Cloud Firestore)]
+    B -- Admin SDK<br/>verify_id_token --> E[Firebase Auth]
+    B -- Push API --> F[FCM]
+    F -- High-priority push --> A
 ```
-Firestore Root
-├── users/ (Collection)
-│   └── {userId} (Document)
-│       ├── role: "customer" | "staff"
-│       ├── name: string
-│       ├── email: string
-│       ├── fcmToken: string
-│       ├── isOnline: boolean (staff only)
-│       ├── latitude: number
-│       ├── longitude: number
-│       ├── locationName: string
-│       └── services/ (Sub-collection - staff only)
-│           └── {serviceId} (Document)
-│               ├── id: string
-│               ├── name: string
-│               └── description: string
-│
-├── bookings/ (Collection)
-│   └── {bookingId} (Document)
-│       ├── id: string
-│       ├── customerId: string
-│       ├── staffId: string
-│       ├── serviceId: string
-│       ├── serviceName: string
-│       ├── customerName: string
-│       ├── staffName: string
-│       ├── status: "pending" | "accepted" | "in_progress" | "completed" | "cancelled"
-│       ├── scheduledDate: timestamp | null
-│       ├── customerLatitude: number
-│       ├── customerLongitude: number
-│       ├── staffLatitude: number
-│       ├── staffLongitude: number
-│       ├── notificationSent: boolean
-│       ├── createdAt: server_timestamp
-│       └── updatedAt: server_timestamp
-│
-└── service_requests/ (Collection)
-    └── {requestId} (Document)
-        ├── requested_service: string
-        ├── description: string
-        ├── status: "pending"
-        └── created_at: server_timestamp
+
+### Booking flow
+
+```mermaid
+sequenceDiagram
+    participant C as Customer app
+    participant API as FastAPI
+    participant Auth as Firebase Auth
+    participant DB as Firestore
+    participant FCM as FCM
+    participant S as Staff device
+
+    C->>API: POST /bookings (Bearer token, booking id)
+    API->>Auth: verify_id_token(check_revoked=True)
+    Auth-->>API: customer uid
+    API->>DB: Check booking id (idempotency)
+    alt Already exists
+        API-->>C: 200/201 alreadyCreated: true
+    else New booking
+        API->>DB: Validate staff + service, create booking
+        API->>FCM: Send push to staff fcmToken
+        FCM-->>S: New job notification
+        API->>DB: Record notificationSent
+        API-->>C: 201 Created
+    end
 ```
 
 ---
 
-## 📁 Project Structure
-
-```
-servicehub_backend/
-├── main_updated.py          # Complete production FastAPI application
-├── main.py                  # Core backend routes
-├── serviceAccountKey.json   # Firebase Admin credentials (⚠️ NEVER commit)
-├── .env                     # Secrets & environment config (⚠️ NEVER commit)
-├── .gitignore               # Ignored files, virtual environments, and keys
-└── README.md                # Project documentation & integration guide
-```
-
----
-
-## 🚀 Installation & Quickstart
+## 🚀 Quickstart
 
 ### Prerequisites
-- **Python 3.10 or higher**
-- A **Firebase Project** with Cloud Firestore, Firebase Authentication, and Cloud Messaging enabled.
-- A **Groq Cloud API Key** from [console.groq.com](https://console.groq.com/).
 
-### 1. Clone & Navigate
+- **Python 3.10+**
+- A **Firebase project** with Firestore, Authentication and Cloud Messaging enabled
+- A **Groq API key** from [console.groq.com](https://console.groq.com/)
+
+### 1. Clone
+
 ```bash
 git clone https://github.com/amalmathew2003/service_hub_backend.git
 cd service_hub_backend
 ```
 
-### 2. Create Virtual Environment
+### 2. Create a virtual environment
+
 ```bash
 # Windows (PowerShell)
 python -m venv venv
@@ -401,32 +138,46 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Install Dependencies
+### 3. Install dependencies
+
 ```bash
 pip install fastapi "uvicorn[standard]" firebase-admin groq python-dotenv pydantic
 ```
 
-### 4. Setup Credentials
-1. **Firebase Admin Key:**
-   - Download the service account private key from **Firebase Console > Project Settings > Service Accounts**.
-   - Save it as `serviceAccountKey.json` in the project root directory.
+> 💡 Tip: run `pip freeze > requirements.txt` once and commit it, so others can simply run `pip install -r requirements.txt`.
 
-2. **Environment Variables:**
-   - Create a `.env` file in the root directory:
-   ```env
-   GROQ_API_KEY=gsk_your_groq_api_key_here
-   GROQ_MODEL=openai/gpt-oss-20b
-   ```
+### 4. Add credentials
 
-### 5. Launch the Server
+1. **Firebase Admin key:** Firebase Console → Project Settings → Service Accounts → *Generate new private key*. Save it as `serviceAccountKey.json` in the project root.
+2. **Environment file:** create `.env` in the project root:
 
-Run the production application with auto-reloading:
+```env
+GROQ_API_KEY=gsk_your_groq_api_key_here
+GROQ_MODEL=openai/gpt-oss-20b
+```
+
+### 5. Run
 
 ```bash
 uvicorn main_updated:app --reload --host 0.0.0.0 --port 8000
 ```
 
-> **Note:** If testing with physical mobile devices or emulators on the local network, use your local machine's LAN IP address (e.g. `http://192.168.1.X:8000`).
+Open the interactive docs:
+
+- Swagger UI → <http://127.0.0.1:8000/docs>
+- ReDoc → <http://127.0.0.1:8000/redoc>
+
+### 6. Connect the mobile app
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://<YOUR_LAN_IP>:8000
+```
+
+| Where the app runs | Base URL |
+|---|---|
+| Android emulator | `http://10.0.2.2:8000` |
+| iOS simulator | `http://localhost:8000` |
+| Physical device (same Wi-Fi) | `http://<your-computer-LAN-IP>:8000` |
 
 ---
 
@@ -434,32 +185,361 @@ uvicorn main_updated:app --reload --host 0.0.0.0 --port 8000
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `GROQ_API_KEY` | **Yes** | — | Secret API key for Groq LLM inference |
-| `GROQ_MODEL` | No | `openai/gpt-oss-20b` | Model identifier on Groq Cloud |
+| `GROQ_API_KEY` | ✅ Yes | — | Groq API key |
+| `GROQ_MODEL` | No | `openai/gpt-oss-20b` | Groq model identifier |
+
+Files you must keep **out of Git**: `.env` and `serviceAccountKey.json`.
+
+---
+
+## 📡 API Reference
+
+### Authentication
+
+Protected endpoints expect a Firebase ID token:
+
+```http
+Authorization: Bearer <FIREBASE_ID_TOKEN>
+```
+
+Tokens are verified server-side with `firebase_admin.auth.verify_id_token(token, check_revoked=True)`.
+
+### Endpoint overview
+
+| Method | Path | Auth | Purpose |
+|---|---|:---:|---|
+| `POST` | `/chat` | No | General assistant reply |
+| `POST` | `/identify-service` | No | Map a message to a catalog service |
+| `GET` | `/staff/search` | No | Find nearby online staff |
+| `POST` | `/staff/service-suggestions` | No | AI service-name suggestions |
+| `POST` | `/bookings` | ✅ Customer | Create a booking and notify staff |
+| `POST` | `/notifications/test` | ✅ Staff | Send a test push to own device |
+| `POST` | `/service-requests` | No | Request an unlisted service |
+| `GET` | `/`, `/health`, `/firebase-test`, `/firebase-users-test` | No | Status and diagnostics |
+
+<details>
+<summary><b>POST /chat</b></summary>
+
+Request:
+
+```json
+{ "message": "My kitchen tap is dripping continuously. Who can fix it?" }
+```
+
+Response `200`:
+
+```json
+{ "reply": "It looks like you have a plumbing leak. I recommend booking a certified Plumber to replace the washer or repair the pipe valve." }
+```
+
+</details>
+
+<details>
+<summary><b>POST /identify-service</b></summary>
+
+Maps free text to a service that exists in Firestore.
+
+Request:
+
+```json
+{ "message": "I need my split air conditioner cleaned and serviced before summer." }
+```
+
+Response `200`:
+
+```json
+{
+  "reply": "I found a matching service: AC Cleaning. Would you like to proceed?",
+  "service_name": "AC Cleaning",
+  "requires_confirmation": false
+}
+```
+
+</details>
+
+<details>
+<summary><b>GET /staff/search</b></summary>
+
+| Parameter | Type | Required | Description |
+|---|---|:---:|---|
+| `latitude` | float | ✅ | Customer latitude, e.g. `9.9312` |
+| `longitude` | float | ✅ | Customer longitude, e.g. `76.2673` |
+| `service_name` | string | No | Filter by service, e.g. `Plumbing` |
+| `radius_km` | float | No | Search radius in km (default `15.0`) |
+
+Request:
+
+```http
+GET /staff/search?latitude=9.9816&longitude=76.2999&service_name=AC%20Cleaning&radius_km=10
+```
+
+Response `200`:
+
+```json
+{
+  "count": 1,
+  "service_name": "AC Cleaning",
+  "radius_km": 10.0,
+  "staff": [
+    {
+      "staff_id": "u4JkL992aP",
+      "name": "Alex Thomas",
+      "location_name": "Kaloor, Kochi",
+      "profile_image": "https://storage.googleapis.com/...",
+      "latitude": 9.9890,
+      "longitude": 76.3050,
+      "distance_km": 0.98,
+      "services": [
+        {
+          "service_id": "srv_ac_01",
+          "name": "AC Cleaning",
+          "description": "Deep chemical foam washing and coil cleaning"
+        }
+      ]
+    }
+  ]
+}
+```
+
+</details>
+
+<details>
+<summary><b>POST /staff/service-suggestions</b></summary>
+
+Request:
+
+```json
+{ "service_text": "air conditioner" }
+```
+
+Response `200`:
+
+```json
+{
+  "query": "air conditioner",
+  "source": "groq",
+  "suggestions": [
+    "AC Mechanic",
+    "AC Cleaning",
+    "AC Installation",
+    "AC Gas Refilling",
+    "AC Water Leakage Repair"
+  ]
+}
+```
+
+</details>
+
+<details>
+<summary><b>POST /bookings</b> 🔒</summary>
+
+Creates the booking atomically and pushes a notification to the staff member.
+
+Headers: `Authorization: Bearer <CUSTOMER_FIREBASE_ID_TOKEN>`
+
+Request:
+
+```json
+{
+  "id": "book_981240182",
+  "staffId": "staff_uid_456",
+  "serviceId": "srv_plumb_01",
+  "scheduledDate": "2026-10-25T10:30:00Z",
+  "staffLatitude": 9.9890,
+  "staffLongitude": 76.3050
+}
+```
+
+Response `201`:
+
+```json
+{
+  "success": true,
+  "bookingId": "book_981240182",
+  "notificationSent": true,
+  "alreadyCreated": false,
+  "message": "Booking created successfully."
+}
+```
+
+**Idempotency:** if the client retries with the same `id` after a network drop, no duplicate is created and the response returns `alreadyCreated: true`.
+
+</details>
+
+<details>
+<summary><b>POST /notifications/test</b> 🔒</summary>
+
+Headers: `Authorization: Bearer <STAFF_FIREBASE_ID_TOKEN>`
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "messageId": "projects/servicehub/messages/0:1697...",
+  "message": "Firebase accepted the test notification for delivery."
+}
+```
+
+Supports Android high-priority channels and Apple APNs sound payloads.
+
+</details>
+
+<details>
+<summary><b>POST /service-requests</b></summary>
+
+Request:
+
+```json
+{
+  "requested_service": "Solar Panel Pressure Washing",
+  "description": "Need rooftop solar panels cleaned of moss and dust"
+}
+```
+
+Response `201`:
+
+```json
+{
+  "success": true,
+  "request_id": "req_88a9df21",
+  "requested_service": "Solar Panel Pressure Washing",
+  "status": "pending",
+  "message": "Thank you for your suggestion! We've recorded your request for future review."
+}
+```
+
+</details>
+
+<details>
+<summary><b>Health and diagnostics</b></summary>
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Root status message |
+| `GET` | `/health` | Liveness probe → `{"status": "healthy"}` |
+| `GET` | `/firebase-test` | Checks Firestore connectivity and lists root collections |
+| `GET` | `/firebase-users-test` | Shows the first 5 documents in `users` |
+
+⚠️ The two `firebase-*` diagnostic routes expose data. Disable or protect them in production.
+
+</details>
+
+---
+
+## 🗄️ Firestore Schema
+
+```
+Firestore
+├── users/{userId}
+│   ├── role: "customer" | "staff"
+│   ├── name, email
+│   ├── fcmToken
+│   ├── isOnline            (staff only)
+│   ├── latitude, longitude
+│   ├── locationName
+│   └── services/{serviceId}   (sub-collection, staff only)
+│       ├── id, name
+│       └── description
+│
+├── bookings/{bookingId}
+│   ├── id
+│   ├── customerId, customerName
+│   ├── staffId, staffName
+│   ├── serviceId, serviceName
+│   ├── status: "pending" | "accepted" | "in_progress" | "completed" | "cancelled"
+│   ├── scheduledDate: timestamp | null
+│   ├── customerLatitude, customerLongitude
+│   ├── staffLatitude, staffLongitude
+│   ├── notificationSent: boolean
+│   └── createdAt, updatedAt: server timestamps
+│
+└── service_requests/{requestId}
+    ├── requested_service
+    ├── description
+    ├── status: "pending"
+    └── created_at: server timestamp
+```
+
+---
+
+## 📁 Project Structure
+
+```
+service_hub_backend/
+├── main_updated.py          # Production FastAPI app (run this one)
+├── main.py                  # Earlier core routes
+├── serviceAccountKey.json   # Firebase Admin credentials (never commit)
+├── .env                     # Secrets and config (never commit)
+├── .gitignore
+└── README.md
+```
+
+> 💡 Having both `main.py` and `main_updated.py` can confuse contributors. Consider renaming `main_updated.py` to `main.py` (and deleting the old one) so the run command becomes `uvicorn main:app`.
+
+---
+
+## 🛡️ Security
+
+- **Server-side token verification:** user identity always comes from the verified ID token, never from IDs in the request body.
+- **Role checks:** staff accounts cannot create customer bookings.
+- **Fail-safe notifications:** FCM failures are logged and stored as `notificationSent: false`; retries never duplicate bookings.
+- **Secrets:** `.env` and `serviceAccountKey.json` must be listed in `.gitignore`. If a key is ever committed, rotate it immediately.
+- **Production hardening to consider:** restrict CORS to your app, add rate limiting on AI endpoints, and remove the diagnostic routes.
+
+Minimum `.gitignore`:
+
+```gitignore
+.env
+serviceAccountKey.json
+venv/
+__pycache__/
+*.pyc
+```
+
+---
+
+## 🩺 Troubleshooting
+
+| Problem | Likely fix |
+|---|---|
+| `ModuleNotFoundError` | Activate the virtual environment and re-run `pip install` |
+| Firebase initialization error | Check that `serviceAccountKey.json` exists in the project root and belongs to the right project |
+| Groq errors or empty replies | Verify `GROQ_API_KEY` and `GROQ_MODEL` in `.env`; the service falls back to algorithmic matching when possible |
+| Mobile app cannot connect | Run with `--host 0.0.0.0`, use the right base URL (see [Quickstart](#6-connect-the-mobile-app)), and keep phone and computer on the same network |
+| `/staff/search` returns 0 staff | Staff must be `isOnline: true`, have coordinates, offer the service, and be inside `radius_km` |
+| Push not received | Check the staff user's `fcmToken` in Firestore and try `POST /notifications/test` |
+| 401 on `/bookings` | Token missing, expired or revoked. Re-authenticate and send a fresh ID token |
 
 ---
 
 ## 📱 Related Repositories
 
-| Repository | Tech Stack | Role |
+| Repository | Stack | Role |
 |---|---|---|
-| [**service_hub_ai**](https://github.com/amalmathew2003/service_hub_ai) | Flutter (Dart), Firebase | Cross-platform mobile app for customers and providers |
+| [service_hub_ai](https://github.com/amalmathew2003/service_hub_ai) | Flutter, Firebase | Customer and staff mobile app |
+| **service_hub_backend** (this repo) | FastAPI, Groq, Firebase Admin | AI, search, bookings, notifications |
 
 ---
 
-## 🛡️ Security Best Practices
+## 🤝 Contributing
 
-- **Token Auditing:** Always verify Firebase tokens server-side; never rely on user IDs passed in the request body.
-- **Role Verification:** Staff users are prevented from creating customer bookings to prevent malicious state manipulation.
-- **Fail-Safe FCM:** FCM delivery failures are logged and recorded on the booking document (`notificationSent: false`), preventing client retries from duplicating bookings.
-- **Secret Protection:** `serviceAccountKey.json` and `.env` are strictly excluded via `.gitignore`.
+1. Fork the repo and create a branch: `git checkout -b feature/your-feature`
+2. Keep new endpoints documented in this README and visible in `/docs`
+3. Test locally with `uvicorn ... --reload` before opening a pull request
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE).
 
-<p align="center">
-  Built with ❤️ by <a href="https://github.com/amalmathew2003">Amal Mathew</a>
-</p>
+<div align="center">
+
+<br/>
+
+**Built with ❤️ by [Amal Mathew](https://github.com/amalmathew2003)**
+
+*Powering ServiceHub AI with FastAPI, Firebase & Groq.*
+
+</div>
