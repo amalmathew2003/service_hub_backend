@@ -679,11 +679,13 @@ Keep the reply short and helpful.
 # 11. SUBMIT A REQUEST FOR AN UNREGISTERED SERVICE
 # =====================================================
 
+
 @app.post("/service-requests", status_code=201)
 def create_service_request(request: ServiceRequestCreate):
     requested_service = request.requested_service.strip()
     description = request.description.strip()
 
+    # Validate the requested service
     if len(requested_service) < 2:
         raise HTTPException(
             status_code=422,
@@ -691,6 +693,7 @@ def create_service_request(request: ServiceRequestCreate):
         )
 
     try:
+        # Prepare data for Firestore
         request_data = {
             "requested_service": requested_service,
             "description": description,
@@ -698,8 +701,16 @@ def create_service_request(request: ServiceRequestCreate):
             "created_at": firestore.SERVER_TIMESTAMP,
         }
 
+        # Save the request
         doc_ref = db.collection("service_requests").document()
         doc_ref.set(request_data)
+
+        print(
+            f"Service request created successfully: "
+            f"request_id={doc_ref.id}, "
+            f"requested_service={requested_service}",
+            flush=True,
+        )
 
         return {
             "success": True,
@@ -713,8 +724,18 @@ def create_service_request(request: ServiceRequestCreate):
             ),
         }
 
-    except Exception:
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        # Log the actual error in the FastAPI terminal
+        print(
+            f"Service request submission failed: "
+            f"{type(error).__name__}: {error}",
+            flush=True,
+        )
         traceback.print_exc()
+
         raise HTTPException(
             status_code=500,
             detail="Unable to submit your service request right now.",
