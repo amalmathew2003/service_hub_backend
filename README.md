@@ -152,7 +152,7 @@ pip install fastapi "uvicorn[standard]" firebase-admin groq python-dotenv pydant
 2. **Environment file:** create `.env` in the project root:
 
 ```env
-GROQ_API_KEY=gsk_your_groq_api_key_here
+GROQ_API_KEY=<your-groq-api-key>
 GROQ_MODEL=openai/gpt-oss-20b
 ```
 
@@ -469,8 +469,7 @@ Firestore
 service_hub_backend/
 ├── main_updated.py          # Production FastAPI app (run this one)
 ├── main.py                  # Earlier core routes
-├── serviceAccountKey.json   # Firebase Admin credentials (never commit)
-├── .env                     # Secrets and config (never commit)
+├── .env                     # Local secrets (git-ignored)
 ├── .gitignore
 └── README.md
 ```
